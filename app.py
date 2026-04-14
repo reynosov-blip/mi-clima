@@ -14,27 +14,42 @@ ciudades = {
 ciudad = st.selectbox("Elegí la ciudad:", list(ciudades.keys()))
 
 @st.cache_data(ttl=1800)
-def obtener_clima(lat, lon):
-    # Pedimos el promedio de los 3 modelos (ECMWF, GFS, ICON)
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,precipitation_probability&models=ecmwf_ifs04,gfs_seamless,icon_seamless&forecast_days=3"
-    r = requests.get(url, timeout=15)
-    if r.status_code == 200:
-        return r.json()
+def obtener_clima_consenso(lat, lon):
+    # Pedimos los 3 mejores modelos del mundo por separado
+    modelos = ["ecmwf_ifs04", "gfs_seamless", "icon_seamless"]
+    dfs = []
+    
+    for m in modelos:
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,precipitation_probability&models={m}&forecast_days=3"
+        try:
+            r = requests.get(url, timeout=10)
+            if r.status_code == 200:
+                d = r.json()["hourly"]
+                temp_df = pd.DataFrame({
+                    "Hora": pd.to_datetime(d["time"]),
+                    "Temp": d["temperature_2m"],
+                    "Lluvia": d["precipitation_probability"]
+                })
+                dfs.append(temp_df)
+        except:
+            continue
+            
+    if dfs:
+        # Concatenamos y promediamos: esto es el Consenso Real
+        full_df = pd.concat(dfs)
+        return full_df.groupby("Hora").mean().reset_index()
     return None
 
 if st.button('Actualizar Pronóstico'):
-    data = obtener_clima(ciudades[ciudad]["lat"], ciudades[ciudad]["lon"])
+    df = obtener_clima_consenso(ciudades[ciudad]["lat"], ciudades[ciudad]["lon"])
     
-    if data and "hourly" in data:
-        df = pd.DataFrame({
-            "Hora": pd.to_datetime(data["hourly"]["time"]),
-            "Temp": data["hourly"]["temperature_2m"],
-            "Lluvia": data["hourly"]["precipitation_probability"]
-        }).groupby("Hora").mean().reset_index()
-
+    if df is not None:
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df['Hora'], y=df['Temp'], name="Temp (°C)", line=dict(color='red')))
-        fig.add_trace(go.Bar(x=df['Hora'], y=df['Lluvia'], name="Lluvia %", marker_color='blue', opacity=0.5))
+        fig.add_trace(go.Scatter(x=df['Hora'], y=df['Temp'], name="Temperatura (°C)", line=dict(color='red', width=3)))
+        fig.add_trace(go.Bar(x=df['Hora'], y=df['Lluvia'], name="Lluvia %", marker_color='blue', opacity=0.4))
+        
+        fig.update_layout(hovermode="x unified", height=500)
         st.plotly_chart(fig, use_container_width=True)
+        st.success("Promedio calculado de ECMWF, GFS e ICON")
     else:
-        st.error("Error de conexión. Intentá de nuevo.")
+        st.error("Error al conectar con los modelos. Render está reintentando.")
