@@ -1,4 +1,5 @@
 streamlit
-openmeteo-requests
 pandas
+requests
 plotly
+gunicorn
