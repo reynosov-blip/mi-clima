@@ -43,14 +43,12 @@ if st.button('Actualizar Pronóstico'):
         df = traer_datos(ciudades[ciudad]["lat"], ciudades[ciudad]["lon"], m_id)
         
         if df is not None:
-            # Gráfico de Temperatura y Viento
             fig = make_subplots(specs=[[{"secondary_y": True}]])
             fig.add_trace(go.Scatter(x=df['Hora'], y=df['Temp'], name="Temp °C", line=dict(color='red', width=3)))
             fig.add_trace(go.Scatter(x=df['Hora'], y=df['Viento'], name="Viento km/h", line=dict(color='green', dash='dot')), secondary_y=True)
             fig.update_layout(height=250, margin=dict(l=0, r=0, t=30, b=0), showlegend=False)
             st.plotly_chart(fig, use_container_width=True)
 
-            # Gráfico de Lluvia (Barras para mm, línea para %)
             fig2 = make_subplots(specs=[[{"secondary_y": True}]])
             fig2.add_trace(go.Bar(x=df['Hora'], y=df['Lluvia_mm'], name="mm", marker_color='blue'))
             fig2.add_trace(go.Scatter(x=df['Hora'], y=df['Prob_Lluvia'], name="%", line=dict(color='cyan')), secondary_y=True)
